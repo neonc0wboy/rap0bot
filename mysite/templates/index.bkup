@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Рэп-Генератор на Seed-словах</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #667eea;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .result.show {
+            display: block;
+        }
+
+        .seed-words {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #ffc107;
+        }
+
+        .seed-words h3 {
+            color: #856404;
+            margin-bottom: 10px;
+        }
+
+        .seed-words p {
+            color: #856404;
+            word-break: break-word;
+        }
+
+        .rap-text {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            line-height: 1.8;
+            font-family: 'Courier New', monospace;
+            border-left: 4px solid #667eea;
+        }
+
+        .loading {
+            text-align: center;
+            color: #667eea;
+            font-weight: 600;
+            display: none;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: none;
+            border-left: 4px solid #dc3545;
+        }
+
+        .error.show {
+            display: block;
+        }
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+.lang-toggle {
+    position: relative;
+    width: 160px;
+    height: 44px;
+    background: #f0f0f0;
+    border-radius: 25px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    margin: 20px auto;
+}
+
+.lang-toggle input {
+    display: none;
+}
+
+.lang-toggle label {
+    flex: 1;
+    text-align: center;
+    font-weight: 600;
+    color: #555;
+    z-index: 2;
+    cursor: pointer;
+    transition: color 0.3s ease, font-weight 0.3s ease;
+}
+
+.lang-slider {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 76px;
+    height: 40px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 20px;
+    transition: all 0.3s ease;
+    z-index: 1;
+}
+
+/* Перемещение бегунка */
+.lang-toggle input[value="en"]:checked ~ .lang-slider {
+    left: 82px;
+}
+
+/* Подсветка выбранного языка */
+.lang-toggle input[value="ru"]:checked ~ label.ru {
+    color: white;
+    font-weight: 700;
+    animation: pulse 0.6s ease;
+    text-shadow: 0 0 8px rgba(102,126,234,0.8);
+}
+
+.lang-toggle input[value="en"]:checked ~ label.en {
+    color: white;
+    font-weight: 700;
+    animation: pulse 0.6s ease;
+    text-shadow: 0 0 8px rgba(118,75,162,0.8);
+}
+
+.progress {
+    width: 100%;
+    height: 8px;
+    background: #eee;
+    border-radius: 6px;
+    overflow: hidden;
+    margin: 12px 0 4px;
+    display: none;
+}
+.progress.show { display: block; }
+
+.progress-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    transition: width 0.4s ease;
+}
+
+.status {
+    text-align: center;
+    color: #667eea;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 Рэп-Генератор</h1>
+        <p class="subtitle">Генерация рэп-текстов на основе seed-слов</p>
+
+<form id="rapForm">
+    <div class="form-group">
+        <label for="artistName">Имя артиста (опционально)</label>
+        <input type="text" id="artistName" placeholder="Введите имя артиста...">
+    </div>
+
+    <div class="form-group">
+        <label for="inviteCode">Код доступа</label>
+        <input type="text" id="inviteCode" placeholder="Введите код доступа..." required>
+    </div>
+    <!-- Смысловая окраска -->
+<div class="form-group">
+  <label class="group-title">Смысловая окраска</label>
+
+  <label for="punchAmount">Панчи (0–5)</label>
+  <input type="range" id="punchAmount" name="punchAmount" min="0" max="5" value="3">
+
+  <label for="lyricsLove" class="checkbox-label">
+    <input type="checkbox" id="lyricsLove" name="lyricsLove"> Лирика (пишем про любовь?)
+  </label>
+
+  <label for="storytelling" class="checkbox-label">
+    <input type="checkbox" id="storytelling" name="storytelling"> Сторителлинг (про вас и вашу жизнь)
+  </label>
+
+  <label for="melancholy" class="checkbox-label">
+    <input type="checkbox" id="melancholy" name="melancholy"> Меланхолия
+  </label>
+
+  <label for="oneVsAll" class="checkbox-label">
+    <input type="checkbox" id="oneVsAll" name="oneVsAll"> Один против всех (1 vs ALL)
+  </label>
+</div>
+
+
+<!-- Настроение -->
+<div class="form-group">
+  <label for="mood">Настроение (from sad 1 – to Happy 5)</label>
+  <input type="range" id="mood" name="mood" min="1" max="5" value="3">
+  <div id="moodLabel">3</div>
+</div>
+
+
+<div class="form-group">
+    <label for="seedWordsInput">Seed-слова (опционально)</label>
+    <input type="text" id="seedWordsInput" placeholder="Введите свои seed-слова...">
+
+<div class="lang-toggle">
+    <input type="radio" id="langRu" name="seedLang" value="ru" checked>
+    <label for="langRu" class="ru">🇷🇺 RU</label>
+
+    <input type="radio" id="langEn" name="seedLang" value="en">
+    <label for="langEn" class="en">🇬🇧 EN</label>
+
+    <div class="lang-slider"></div>
+</div>
+
+
+
+    <button type="button" id="randomSeedBtn">🎲 Случайные seed-слова</button>
+</div>
+
+
+    <button type="submit" id="generateBtn">Сгенерировать рэп 🔥</button>
+</form>
+
+        <div class="loading" id="loading">
+            <p>⏳ Генерация рэп-текста... Пожалуйста, подождите...</p>
+        </div>
+<div class="status" id="status"></div>
+<div class="progress" id="progress"><div class="progress-bar" id="progressBar"></div></div>
+
+        <div class="error" id="error"></div>
+
+        <div class="result" id="result">
+            <div class="seed-words">
+                <h3>🌱 Seed-слова (основа сюжета):</h3>
+                <p id="seedWords"></p>
+            </div>
+            <div class="rap-text" id="rapText"></div>
+        </div>
+    </div>
+
+<script>
+const mood = document.getElementById('mood'); const moodLabel = document.getElementById('moodLabel'); mood.addEventListener('input', () => moodLabel.textContent = mood.value);
+
+document.addEventListener("DOMContentLoaded", () => {
+    const form = document.getElementById('rapForm');
+    const loading = document.getElementById('loading');
+    const result = document.getElementById('result');
+    const error = document.getElementById('error');
+    const generateBtn = document.getElementById('generateBtn');
+    const randomSeedBtn = document.getElementById('randomSeedBtn');
+    const seedWordsInput = document.getElementById('seedWordsInput');
+    const statusEl = document.getElementById('status');
+    const progressEl = document.getElementById('progress');
+    const progressBar = document.getElementById('progressBar');
+
+    // UI helpers
+    function setStatus(text) {
+        statusEl.textContent = text;
+    }
+    function setProgress(percent) {
+        progressEl.classList.add('show');
+        progressBar.style.width = `${percent}%`;
+    }
+    function resetProgress() {
+        progressEl.classList.remove('show');
+        progressBar.style.width = '0%';
+        statusEl.textContent = '';
+    }
+
+    // Fetch with timeout + retries + progressive delay
+    async function fetchWithRetry(url, options = {}, retries = 3, timeout = 30000) {
+        for (let attempt = 1; attempt <= retries; attempt++) {
+            try {
+                setStatus(`🔄 Попытка ${attempt}...`);
+                setProgress(Math.round((attempt - 1) / retries * 100));
+
+                const controller = new AbortController();
+                const id = setTimeout(() => controller.abort(), timeout);
+                const response = await fetch(url, { ...options, signal: controller.signal });
+                clearTimeout(id);
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                setProgress(100);
+                setStatus('✅ Успех');
+                return response;
+            } catch (err) {
+                setStatus(`❌ Попытка ${attempt} не удалась: ${err.message}`);
+                if (attempt === retries) {
+                    throw new Error("Все попытки исчерпаны. Сервер недоступен или слишком долго отвечает.");
+                }
+                // прогрессивная задержка
+                await new Promise(r => setTimeout(r, 1200 * attempt));
+            }
+        }
+    }
+
+    // Случайные seed-слова
+    randomSeedBtn.addEventListener('click', async () => {
+        loading.classList.add('show');
+        error.classList.remove('show');
+        result.classList.remove('show');
+
+        try {
+            const selectedLang = document.querySelector('input[name="seedLang"]:checked');
+            if (!selectedLang) throw new Error("Язык не выбран");
+            const lang = selectedLang.value;
+
+            const response = await fetchWithRetry(`/generate_random_seed?lang=${lang}`, { method: 'GET' }, 3, 15000);
+            const data = await response.json();
+            seedWordsInput.value = data.seed_words;
+            resetProgress();
+        } catch (err) {
+            error.textContent = `❌ Ошибка генерации seed-слов: ${err.message}`;
+            error.classList.add('show');
+        } finally {
+            loading.classList.remove('show');
+        }
+    });
+
+    // Генерация рэпа (GET)
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const artistName = document.getElementById('artistName').value || 'Anonymous';
+        const inviteCode = document.getElementById('inviteCode').value;
+        const seedWords = seedWordsInput.value;
+        const selectedLang = document.querySelector('input[name="seedLang"]:checked');
+
+        if (!selectedLang) {
+            error.textContent = "❌ Ошибка: язык не выбран";
+            error.classList.add('show');
+            return;
+        }
+        const lang = selectedLang.value;
+
+        loading.classList.add('show');
+        result.classList.remove('show');
+        error.classList.remove('show');
+        generateBtn.disabled = true;
+
+        try {
+            const params = new URLSearchParams({
+                artist_name: artistName,
+                invite_code: inviteCode,
+                seed_words: seedWords,
+                lang: lang
+            });
+
+            const response = await fetchWithRetry(`/generate_rap?${params.toString()}`, { method: 'GET' }, 3, 30000);
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Ошибка при генерации');
+
+            document.getElementById('seedWords').textContent = data.seed_words;
+            document.getElementById('rapText').textContent = data.rap_text;
+            result.classList.add('show');
+            resetProgress();
+        } catch (err) {
+            error.textContent = `❌ Ошибка: ${err.message}`;
+            error.classList.add('show');
+        } finally {
+            loading.classList.remove('show');
+            generateBtn.disabled = false;
+        }
+    });
+});
+
+        </script>
+</body>
+</html>

@@ -1,0 +1,409 @@
+ <!DOCTYPE html>
+
+<html lang="ru">
+
+<head>
+
+<meta charset="utf-8">
+
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>🎤 Рэп-Генератор</title>
+
+<link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>🎤 Рэп-Генератор</h1>
+
+<p class="subtitle">Генерация рэп-текстов на основе seed-слов и настроек</p>
+
+
+<form id="rapForm" class="form">
+
+<div class="form-group">
+
+<label for="artistName">Имя артиста</label>
+
+<input type="text" id="artistName" name="artist_name" placeholder="Введите имя артиста...">
+
+</div>
+
+
+<div class="form-group">
+
+<label for="inviteCode">Код доступа</label>
+
+<input type="text" id="inviteCode" name="invite_code" placeholder="Введите код доступа..." required>
+
+</div>
+
+
+<div class="form-group">
+
+<label for="seedWordsInput">Seed-слова</label>
+
+<input type="text" id="seedWordsInput" name="seed_words" placeholder="Введите свои seed-слова...">
+
+
+<div class="lang-toggle">
+
+<input type="radio" id="langRu" name="seedLang" value="ru" checked>
+
+<label for="langRu" class="ru">🇷🇺 RU</label>
+
+
+<input type="radio" id="langEn" name="seedLang" value="en">
+
+<label for="langEn" class="en">🇬🇧 EN</label>
+
+
+<div class="lang-slider"></div>
+
+</div>
+
+
+<div class="seed-actions">
+
+<button type="button" id="randomSeedBtn" class="btn">🎲 Случайные seed-слова</button>
+
+</div>
+
+</div>
+
+
+<div class="form-group">
+
+<label class="group-title">Смысловая окраска</label>
+
+
+<label for="punchAmount">Панчи (0–5)</label>
+
+<input type="range" id="punchAmount" name="punch_amount" min="0" max="5" value="3">
+
+
+<label for="lyricsLove" class="checkbox-label">
+
+<input type="checkbox" id="lyricsLove" name="lyrics_love"> Лирика (пишем про любовь?)
+
+</label>
+
+
+<label for="storytelling" class="checkbox-label">
+
+<input type="checkbox" id="storytelling" name="storytelling"> Сторителлинг (про вас и вашу жизнь)
+
+</label>
+
+
+<label for="melancholy" class="checkbox-label">
+
+<input type="checkbox" id="melancholy" name="melancholy"> Меланхолия
+
+</label>
+
+
+<label for="oneVsAll" class="checkbox-label">
+
+<input type="checkbox" id="oneVsAll" name="one_vs_all"> Один против всех (1 vs ALL)
+
+</label>
+
+</div>
+
+
+<div class="form-group">
+
+<label for="mood">Настроение (1–5)</label>
+
+<input type="range" id="mood" name="mood" min="1" max="5" value="3">
+
+</div>
+
+
+<div class="form-actions">
+
+<button type="submit" id="generateBtn" class="btn primary">Сгенерировать рэп 🔥</button>
+
+<button type="button" id="playTTSBtn" class="btn" disabled>🔊 Озвучить рэп</button>
+
+</div>
+
+
+</form>
+
+
+<div class="loading" id="loading" aria-hidden="true"><p>⏳ Генерация рэп-текста...</p></div>
+
+
+<div class="status" id="status" aria-live="polite"></div>
+
+<div class="progress" id="progress"><div class="progress-bar" id="progressBar"></div></div>
+
+
+<div class="error" id="error" role="alert"></div>
+
+
+<div class="result" id="result" aria-live="polite">
+
+<div class="seed-words">
+
+<h3>🌱 Seed-слова:</h3>
+
+<pre id="seedWords" class="pre-text"></pre>
+
+</div>
+
+<div class="rap-text">
+
+<h3>📝 Текст:</h3>
+
+<div id="rapText" class="pre-text">{{ rap_text|safe }}</div>
+
+</div>
+
+</div>
+
+</div>
+
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const form = document.getElementById('rapForm');
+  const loading = document.getElementById('loading');
+  const result = document.getElementById('result');
+  const error = document.getElementById('error');
+  const generateBtn = document.getElementById('generateBtn');
+  const randomSeedBtn = document.getElementById('randomSeedBtn');
+  const seedWordsInput = document.getElementById('seedWordsInput');
+  const statusEl = document.getElementById('status');
+  const progressEl = document.getElementById('progress');
+  const progressBar = document.getElementById('progressBar');
+  const playTTSBtn = document.getElementById('playTTSBtn');
+
+  let currentAudio = null;
+  let currentAudioUrl = null;
+  let isPlaying = false;
+
+  function setStatus(text) { statusEl.textContent = text || ''; }
+  function setProgress(percent) { progressEl.classList.add('show'); progressBar.style.width = `${percent}%`; }
+  function resetProgress() { progressEl.classList.remove('show'); progressBar.style.width = '0%'; setStatus(''); }
+
+
+
+  async function fetchWithRetry(url, options = {}, retries = 50, timeout = 30000) {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        setStatus(`🔄 Попытка ${attempt}...`);
+        setProgress(Math.round((attempt - 1) / retries * 100));
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), timeout);
+        const response = await fetch(url, { ...options, signal: controller.signal });
+        clearTimeout(id);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        setProgress(100);
+        setStatus('✅ Успех');
+        return response;
+      } catch (err) {
+        setStatus(`❌ Попытка ${attempt} не удалась: ${err.message}`);
+        if (attempt === retries) throw new Error("Все попытки исчерпаны. Сервер недоступен или слишком долго отвечает.");
+        await new Promise(r => setTimeout(r, 1200 * attempt));
+      }
+    }
+  }
+
+  // Random seed
+  randomSeedBtn.addEventListener('click', async () => {
+    loading.classList.add('show');
+    error.classList.remove('show');
+    result.classList.remove('show');
+    try {
+      const selectedLang = document.querySelector('input[name="seedLang"]:checked');
+      if (!selectedLang) throw new Error("Язык не выбран");
+      const lang = selectedLang.value;
+      const response = await fetchWithRetry(`/generate_random_seed?lang=${encodeURIComponent(lang)}`, { method: 'GET' }, 3, 15000);
+      const data = await response.json();
+      seedWordsInput.value = data.seed_words || '';
+      resetProgress();
+    } catch (err) {
+      error.textContent = `❌ Ошибка генерации seed-слов: ${err.message}`;
+      error.classList.add('show');
+    } finally {
+      loading.classList.remove('show');
+    }
+  });
+
+  // TTS helpers
+  function enableTTSButton(enable) {
+    playTTSBtn.disabled = !enable;
+    playTTSBtn.textContent = enable ? (isPlaying ? '⏹ Остановить' : '🔊 Озвучить рэп') : '🔊 Озвучить рэп';
+  }
+
+  function stopCurrentAudio() {
+    if (currentAudio) {
+      try { currentAudio.pause(); } catch (e) {}
+      try { currentAudio.src = ""; } catch (e) {}
+      currentAudio = null;
+    }
+    if (currentAudioUrl) {
+      try { URL.revokeObjectURL(currentAudioUrl); } catch (e) {}
+      currentAudioUrl = null;
+    }
+    isPlaying = false;
+    enableTTSButton(true);
+    setStatus('');
+  }
+
+  async function playRapTTS(rapText, lang) {
+    // если уже играет — остановим
+    if (isPlaying) {
+      stopCurrentAudio();
+      return;
+    }
+
+    if (!rapText) return;
+    playTTSBtn.disabled = true;
+    setStatus('🔊 Генерируем аудио...');
+    try {
+      const resp = await fetch('/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rap_text: rapText, lang: lang })
+      });
+      if (!resp.ok) {
+        const errJson = await resp.json().catch(()=>null);
+        throw new Error(errJson && errJson.error ? errJson.error : `TTS request failed (${resp.status})`);
+      }
+      const blob = await resp.blob();
+      // очистим предыдущие ресурсы
+      stopCurrentAudio();
+
+      currentAudioUrl = URL.createObjectURL(blob);
+      currentAudio = new Audio(currentAudioUrl);
+      currentAudio.onended = () => {
+        stopCurrentAudio();
+      };
+      currentAudio.onerror = (ev) => {
+        console.error('Audio playback error', ev);
+        stopCurrentAudio();
+        error.textContent = '❌ Ошибка воспроизведения аудио';
+        error.classList.add('show');
+      };
+
+      isPlaying = true;
+      enableTTSButton(true);
+      playTTSBtn.textContent = '⏹ Остановить';
+      currentAudio.play().catch(err => {
+        console.error('Play failed', err);
+        stopCurrentAudio();
+        error.textContent = '❌ Не удалось воспроизвести аудио';
+        error.classList.add('show');
+      });
+      setStatus('▶️ Воспроизведение');
+    } catch (err) {
+      console.error('TTS error:', err);
+      setStatus('');
+      error.textContent = `❌ Ошибка TTS: ${err.message}`;
+      error.classList.add('show');
+      enableTTSButton(true);
+    } finally {
+      playTTSBtn.disabled = false;
+    }
+  }
+
+  // play button click
+  playTTSBtn.addEventListener('click', () => {
+    const rapText = document.getElementById('rapText').textContent;
+    if (!rapText) return;
+    const lang = document.querySelector('input[name="seedLang"]:checked').value || 'ru';
+    playRapTTS(rapText, lang);
+  });
+
+  // Submit form -> GET
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const artistName = document.getElementById('artistName').value || 'Anonymous';
+    const inviteCode = document.getElementById('inviteCode').value;
+    const seedWords = seedWordsInput.value;
+    const selectedLang = document.querySelector('input[name="seedLang"]:checked');
+    if (!selectedLang) {
+      error.textContent = "❌ Ошибка: язык не выбран";
+      error.classList.add('show');
+      return;
+    }
+    const lang = selectedLang.value;
+
+    const punchAmount = document.getElementById('punchAmount') ? document.getElementById('punchAmount').value : 3;
+    const lyricsLove = document.getElementById('lyricsLove') ? document.getElementById('lyricsLove').checked : false;
+    const storytelling = document.getElementById('storytelling') ? document.getElementById('storytelling').checked : false;
+    const melancholy = document.getElementById('melancholy') ? document.getElementById('melancholy').checked : false;
+    const oneVsAll = document.getElementById('oneVsAll') ? document.getElementById('oneVsAll').checked : false;
+    const mood = document.getElementById('mood') ? document.getElementById('mood').value : 3;
+
+    loading.classList.add('show');
+    result.classList.remove('show');
+    error.classList.remove('show');
+    generateBtn.disabled = true;
+    playTTSBtn.disabled = true;
+
+    try {
+      const params = new URLSearchParams({
+        artist_name: artistName,
+        invite_code: inviteCode,
+        seed_words: seedWords,
+        lang: lang,
+        punch_amount: punchAmount,
+        lyrics_love: lyricsLove ? "1" : "0",
+        storytelling: storytelling ? "1" : "0",
+        melancholy: melancholy ? "1" : "0",
+        one_vs_all: oneVsAll ? "1" : "0",
+        mood: mood
+      });
+
+      const response = await fetchWithRetry(`/generate_rap?${params.toString()}`, { method: 'GET' }, 3, 45000);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Ошибка при генерации');
+
+      document.getElementById('seedWords').textContent = data.seed_words || '';
+      document.getElementById('rapText').textContent = data.rap_text || '';
+      result.classList.add('show');
+      resetProgress();
+
+      // enable TTS if text exists
+      const hasText = Boolean(data.rap_text && data.rap_text.trim());
+      enableTTSButton(hasText);
+      if (hasText) {
+        // автозапуск TTS (можно убрать, если не нужен)
+        playRapTTS(data.rap_text || '', lang);
+      } else {
+        setStatus('');
+      }
+    } catch (err) {
+      error.textContent = `❌ Ошибка: ${err.message}`;
+      error.classList.add('show');
+    } finally {
+      loading.classList.remove('show');
+      generateBtn.disabled = false;
+    }
+  });
+
+  // cleanup on page unload
+  window.addEventListener('beforeunload', () => {
+    stopCurrentAudio();
+  });
+
+  // initial state
+  enableTTSButton(false);
+});
+
+</script>
+
+
+
+</body> </html>
